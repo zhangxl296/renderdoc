@@ -936,6 +936,44 @@ After interop is enabled you will need to reload any capture.</string>
             </property>
            </widget>
           </item>
+
+          
+          <item row="1" column="0">
+                     <widget class="QLabel" name="label_6_1">
+                      <property name="toolTip">
+                       <string>Changes the default directory for the save dialog when saving shader files.
+          
+          Defaults to blank, which follows system default behaviour.</string>
+                      </property>
+                      <property name="text">
+                       <string>Default save directory for shader</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="2" column="0">
+                     <widget class="QLineEdit" name="saveShaderDirectory">
+                      <property name="toolTip">
+                       <string>Changes the default directory for the save dialog when saving shader files.
+          
+          Defaults to blank, which follows system default behaviour.</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="2" column="1">
+                     <widget class="QPushButton" name="browseSaveShaderDirectory">
+                      <property name="toolTip">
+                       <string>Changes the default directory for the save dialog when saving shader files.
+          
+          Defaults to blank, which follows system default behaviour.</string>
+                      </property>
+                      <property name="text">
+                       <string>Browse</string>
+                      </property>
+                     </widget>
+                    </item>
+          
+
+
          </layout>
         </widget>
        </item>

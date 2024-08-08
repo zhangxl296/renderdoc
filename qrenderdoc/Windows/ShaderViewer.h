@@ -30,6 +30,8 @@
 #include <QStyledItemDelegate>
 #include "Code/Interface/QRDInterface.h"
 
+#include <qfilesystemwatcher.h>
+
 namespace Ui
 {
 class ShaderViewer;
@@ -171,6 +173,8 @@ private slots:
   // automatic slots
   void on_findReplace_clicked();
   void on_refresh_clicked();
+  void on_EditExternal_clicked();
+  void on_ExternalFile_changed();
   void on_unrefresh_clicked();
   void on_resetEdits_clicked();
   void on_intView_clicked();
@@ -206,6 +210,20 @@ private slots:
 
 private:
   explicit ShaderViewer(ICaptureContext &ctx, QWidget *parent = 0);
+
+  QString ReadExternalShaderOnDisk(const QString &filename);
+
+  QString GetExternalShaderPath() const;
+  
+  // void InitExternalsShaderPath();
+  QString m_ShaderText;
+  void SaveShaderToExternalFile( );
+  void CheckShaderSaveDirectory();
+
+  void AddExternalFileWatcher(QString &filePath);
+
+  QFileSystemWatcher *fileWatcher;
+
   void editShader(ResourceId id, ShaderStage stage, const QString &entryPoint,
                   const rdcstrpairs &files, KnownShaderTool knownTool,
                   ShaderEncoding shaderEncoding, ShaderCompileFlags flags);

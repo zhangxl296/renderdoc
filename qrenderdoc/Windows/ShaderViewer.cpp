@@ -24,6 +24,7 @@
 
 #include "ShaderViewer.h"
 #include <QComboBox>
+#include <QDesktopServices>
 #include <QFontDatabase>
 #include <QHBoxLayout>
 #include <QKeyEvent>
@@ -74,6 +75,7 @@ Q_DECLARE_METATYPE(AccessedResourceTag);
 ShaderViewer::ShaderViewer(ICaptureContext &ctx, QWidget *parent)
     : QFrame(parent), ui(new Ui::ShaderViewer), m_Ctx(ctx)
 {
+  fileWatcher = nullptr;
   ui->setupUi(this);
 
   ui->constants->setFont(Formatter::PreferredFont());
@@ -196,6 +198,49 @@ ShaderViewer::ShaderViewer(ICaptureContext &ctx, QWidget *parent)
   m_Ctx.AddCaptureViewer(this);
 }
 
+void ShaderViewer::CheckShaderSaveDirectory()
+{
+    if(m_Ctx.Config().DefaultShaderSaveDirectory.isEmpty())
+    {
+      m_Ctx.Config().DefaultShaderSaveDirectory =  RDDialog::getExistingDirectory(this, lit("Shader save dir not set ,please choose a directory "), QDir::homePath());
+      m_Ctx.Config().Save();  
+    }
+}
+
+void ShaderViewer::SaveShaderToExternalFile()
+{
+  CheckShaderSaveDirectory();
+  
+  QString filePath = GetExternalShaderPath();
+
+  //write the shader to the file
+  QFile file(filePath);
+  if(file.open(QIODevice::WriteOnly | QIODevice::Text))
+  {
+    QTextStream out(&file);
+    out << m_ShaderText;
+    file.close();
+  }
+  AddExternalFileWatcher(filePath);
+}
+
+void ShaderViewer::AddExternalFileWatcher(QString &filePath)
+{
+  if(fileWatcher != nullptr)
+  delete fileWatcher;
+
+  fileWatcher = new QFileSystemWatcher(this);
+  fileWatcher->addPath(filePath);
+
+  QObject::connect(fileWatcher, &QFileSystemWatcher::fileChanged,
+                   [this](const QString &path) { on_ExternalFile_changed(); });
+
+  QUrl fileUrl = QUrl::fromLocalFile(filePath);
+  if (!QDesktopServices::openUrl(fileUrl)) {
+    QMessageBox::warning(this, tr("Error"), tr("Cannot open file %1.").arg(filePath));
+  }
+}
+
 void ShaderViewer::editShader(ResourceId id, ShaderStage stage, const QString &entryPoint,
                               const rdcstrpairs &files, KnownShaderTool knownTool,
                               ShaderEncoding shaderEncoding, ShaderCompileFlags flags)
@@ -313,6 +358,8 @@ void ShaderViewer::editShader(ResourceId id, ShaderStage stage, const QString &e
     QString name = QFileInfo(kv.first).fileName();
     QString text = kv.second;
 
+    m_ShaderText = text;
+    
     ScintillaEdit *scintilla = AddFileScintilla(name, text, shaderEncoding);
 
     scintilla->setReadOnly(false);
@@ -1461,6 +1508,7 @@ QVariantMap ShaderViewer::SaveEditor()
 
 ShaderViewer::~ShaderViewer()
 {
+    delete fileWatcher;
   delete m_FindResults;
   m_FindResults = NULL;
 
@@ -6088,6 +6136,36 @@ void ShaderViewer::on_unrefresh_clicked()
   updateEditState();
 }
 
+QString ShaderViewer::ReadExternalShaderOnDisk(const QString &filename)
+{
+  QFile file(filename);
+  if(!file.open(QIODevice::ReadOnly | QIODevice::Text))
+  {
+    ShowErrors(tr("Couldn't open file %1 for reading").arg(filename));
+    return lit("nullptr");
+  }
+
+  QByteArray _data = file.readAll();
+  file.close();
+
+  return QString::fromUtf8(_data);
+}
+
+QString ShaderViewer::GetExternalShaderPath() const
+{
+  QDir baseDir = QDir(m_Ctx.Config().DefaultShaderSaveDirectory);
+  switch(m_Stage)
+  {
+
+    case ShaderStage::Vertex:
+      return baseDir.absoluteFilePath(lit("renderdoc_external_vertex.hlsl"));
+    case ShaderStage::Pixel:
+      return baseDir.absoluteFilePath(lit("renderdoc_external_pixel.hlsl"));
+    default:
+      return baseDir.absoluteFilePath(lit("unkown.hlsl"));
+  }
+}
+
 void ShaderViewer::on_refresh_clicked()
 {
   if(m_Trace)
@@ -6111,6 +6189,116 @@ void ShaderViewer::on_refresh_clicked()
     for(ScintillaEdit *s : m_Scintillas)
     {
       QWidget *w = (QWidget *)s;
+      files.push_back(
+          {w->property("filename").toString(), QString::fromUtf8(s->getText(s->textLength() + 1))});
+    }
+
+    if(files.isEmpty())
+      return;
+
+    QString source = files[0].second;
+
+    if(encoding == ShaderEncoding::HLSL || encoding == ShaderEncoding::Slang ||
+       encoding == ShaderEncoding::GLSL)
+    {
+      bool success = ProcessIncludeDirectives(source, files);
+      if(!success)
+        return;
+    }
+
+    m_Saved = true;
+
+    bytebuf shaderBytes(source.toUtf8());
+
+    rdcarray<ShaderEncoding> accepted = m_Ctx.TargetShaderEncodings();
+
+    rdcstr spirvVer = "spirv1.0";
+    for(const ShaderCompileFlag &flag : m_Flags.flags)
+      if(flag.name == "@spirver")
+        spirvVer = flag.value;
+
+    if(m_CustomShader || (accepted.indexOf(encoding) >= 0 &&
+                          ui->compileTool->currentIndex() == ui->compileTool->count() - 1))
+    {
+      // if using the builtin compiler, just pass through
+    }
+    else
+    {
+      for(const ShaderProcessingTool &tool : m_Ctx.Config().ShaderProcessors)
+      {
+        if(QString(tool.name) == ui->compileTool->currentText())
+        {
+          ShaderToolOutput out = tool.CompileShader(this, source, ui->entryFunc->text(), m_Stage,
+                                                    spirvVer, ui->toolCommandLine->toPlainText());
+
+          ShowErrors(out.log);
+
+          if(out.result.isEmpty())
+            return;
+
+          encoding = tool.output;
+          shaderBytes = out.result;
+          break;
+        }
+      }
+    }
+
+    ShaderCompileFlags flags = m_Flags;
+
+    bool found = false;
+    for(ShaderCompileFlag &f : flags.flags)
+    {
+      if(f.name == "@cmdline")
+      {
+        f.value = ui->toolCommandLine->toPlainText();
+        found = true;
+        break;
+      }
+    }
+
+    if(!found)
+      flags.flags.push_back({"@cmdline", ui->toolCommandLine->toPlainText()});
+
+    m_Modified = false;
+
+    m_SaveCallback(&m_Ctx, this, m_EditingShader, m_Stage, encoding, flags, ui->entryFunc->text(),
+                   shaderBytes);
+  }
+}
+
+void ShaderViewer::on_EditExternal_clicked()
+{
+  SaveShaderToExternalFile();
+}
+
+void ShaderViewer::on_ExternalFile_changed()
+{
+  if(m_Trace)
+  {
+    m_Ctx.GetPipelineViewer()->SaveShaderFile(m_ShaderDetails);
+    return;
+  }
+
+  ShaderEncoding encoding = currentEncoding();
+
+  // if we don't have any compile tools - even the 'builtin' one, this compilation is not going to
+  // succeed.
+  if(ui->compileTool->count() == 0 && !m_CustomShader)
+  {
+    ShowErrors(tr("No compilation tool found that takes %1 as input and produces compatible output")
+                   .arg(ToQStr(encoding)));
+  }
+  else if(m_SaveCallback)
+  {
+    rdcstrpairs files;
+    for(ScintillaEdit *s : m_Scintillas)
+    {
+      QWidget *w = (QWidget *)s;
+
+      QString fileContent =  ReadExternalShaderOnDisk(GetExternalShaderPath());
+
+      s->setText(fileContent.toStdString().c_str());
+
       files.push_back(
           {w->property("filename").toString(), QString::fromUtf8(s->getText(s->textLength() + 1))});
     }

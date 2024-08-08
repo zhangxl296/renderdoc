@@ -168,6 +168,9 @@ SettingsDialog::SettingsDialog(ICaptureContext &ctx, QWidget *parent)
   }
 
   ui->saveDirectory->setText(m_Ctx.Config().DefaultCaptureSaveDirectory);
+  
+  ui->saveShaderDirectory->setText(m_Ctx.Config().DefaultShaderSaveDirectory);
+
   ui->tempDirectory->setText(m_Ctx.Config().TemporaryCaptureDirectory);
 
   ui->shaderTools->setColumnCount(2);
@@ -506,6 +509,21 @@ void SettingsDialog::on_browseSaveCaptureDirectory_clicked()
   {
     m_Ctx.Config().DefaultCaptureSaveDirectory = dir;
     ui->saveDirectory->setText(dir);
+  }
+
+  m_Ctx.Config().Save();
+}
+
+void SettingsDialog::on_browseSaveShaderDirectory_clicked()
+{
+  QString dir =
+      RDDialog::getExistingDirectory(this, tr("Choose default directory for saving shader"),
+                                     m_Ctx.Config().DefaultShaderSaveDirectory);
+
+  if(!dir.isEmpty())
+  {
+    m_Ctx.Config().DefaultShaderSaveDirectory = dir;
+    ui->saveShaderDirectory->setText(dir);
   }
 
   m_Ctx.Config().Save();

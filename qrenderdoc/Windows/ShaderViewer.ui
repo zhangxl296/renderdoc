@@ -369,6 +369,7 @@
       </property>
      </widget>
     </item>
+    
     <item>
      <widget class="QToolButton" name="refresh">
       <property name="toolTip">
@@ -389,6 +390,7 @@
       </property>
      </widget>
     </item>
+    
     <item>
      <widget class="QToolButton" name="unrefresh">
       <property name="toolTip">
@@ -409,6 +411,7 @@
       </property>
      </widget>
     </item>
+    
     <item>
      <widget class="QLabel" name="editStatusLabel">
       <property name="toolTip">
@@ -419,6 +422,28 @@
       </property>
      </widget>
     </item>
+    
+    <item>
+     <widget class="QToolButton" name="EditExternal">
+      <property name="toolTip">
+       <string>Use External editor to modify shader</string>
+      </property>
+      <property name="text">
+       <string>Edit External</string>
+      </property>
+      <property name="icon">
+       <iconset resource="../Resources/resources.qrc">
+          <normaloff>:/folder.png</normaloff>:/folder.png</iconset>
+      </property>
+      <property name="toolButtonStyle">
+       <enum>Qt::ToolButtonTextBesideIcon</enum>
+      </property>
+      <property name="autoRaise">
+       <bool>true</bool>
+      </property>
+     </widget>
+    </item>
+    
     <item>
      <widget class="QToolButton" name="snippets">
       <property name="toolTip">

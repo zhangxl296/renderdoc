@@ -239,6 +239,11 @@ DECLARE_REFLECTION_STRUCT(BugReport);
   CONFIG_SETTING_VAL(public, QString, rdcstr, DefaultCaptureSaveDirectory, "")                     \
                                                                                                    \
   DOCUMENT(                                                                                        \
+      "The default path to save shader in, when editor shader from shaderviewer "           \
+      ".");                                                                               \
+  CONFIG_SETTING_VAL(public, QString, rdcstr, DefaultShaderSaveDirectory, "")                     \
+                                                                                                   \
+  DOCUMENT(                                                                                        \
       "A :class:`ReplayOptions` containing the configured default replay options to use in most "  \
       "scenarios when no specific options are given.\n"                                            \
       "\n:"                                                                                        \
